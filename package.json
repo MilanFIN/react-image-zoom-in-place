@@ -1,6 +1,6 @@
 {
     "name": "react-image-zoom-in-place",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "description": "",
     "main": "lib/index.js",
     "types": "index.d.ts",

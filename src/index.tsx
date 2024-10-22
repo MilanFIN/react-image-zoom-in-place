@@ -3,188 +3,269 @@ import { useEffect, useRef, useState } from "react";
 import { handleHover, resetZoom, setCanvasDimensions } from "./utils";
 
 type ZoomableProps = {
-    src: string;
-    alt: string;
-    zoom: number;
+  src: string;
+  alt: string;
+  zoom: number;
+  maxZoom: number;
+  step: number;
 };
 
 type Point = {
-    x: number;
-    y: number;
+  x: number;
+  y: number;
 };
 
 enum InputMethod {
-    Mouse = "Mouse",
-    Touch = "Touch",
+  Mouse = "Mouse",
+  Touch = "Touch",
 }
 
 const INPUTMETHODLIFESPAN = 200; //ms
+const RESOLUTIONTOZOOMMULTIPLIER = 100;
 
-export function Zoomable(props: ZoomableProps) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [image, setImage] = useState<HTMLImageElement | null>(null);
-    const [zoomed, setZoomed] = useState(false);
-    const [dragging, setDragging] = useState(false);
-    const [dragState, setDragState] = useState<Point>({
-        x: 0,
-        y: 0,
+export function ZoomableImage(props: ZoomableProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [zoomed, setZoomed] = useState(true);
+  const [dragging, setDragging] = useState(false);
+  const [dragState, setDragState] = useState<Point>({
+    x: 0,
+    y: 0,
+  });
+  const [zoomPoint, setZoomPoint] = useState<Point>({
+    x: 0,
+    y: 0,
+  });
+  const [newZoomPoint, setNewZoomPoint] = useState<Point>({
+    x: 0,
+    y: 0,
+  });
+
+  const [firstPoint, setFirstPoint] = useState<Point>({
+    x: 0,
+    y: 0,
+  });
+
+  const [secondPoint, setSecondPoint] = useState<Point>({
+    x: 0,
+    y: 0,
+  });
+
+  const [mouseLocation, setMouseLocation] = useState<Point>({
+    x: 0,
+    y: 0,
+  });
+
+  const [previousPinchDistance, setPreviousPinchDistance] = useState<number>(0);
+
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+
+  const [inputMethod, setInputMethod] = useState<InputMethod | null>(null);
+  const [inputMethodTimestamp, setInputMethodTimestamp] = useState<number>(0);
+
+  // Function to handle mouse move
+  const handleMouseMove = (
+    event: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) => {
+    if (
+      inputMethod != InputMethod.Mouse &&
+      inputMethod != null &&
+      Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
+    ) {
+      return;
+    }
+
+    const eventX = event.clientX;
+    const eventY = event.clientY;
+    setMouseLocation({
+      x: eventX,
+      y: eventY,
     });
-    const [zoomPoint, setZoomPoint] = useState<Point>({
-        x: 0,
-        y: 0,
-    });
-    const [newZoomPoint, setNewZoomPoint] = useState<Point>({
-        x: 0,
-        y: 0,
-    });
-    const [inputMethod, setInputMethod] = useState<InputMethod | null>(null);
-    const [inputMethodTimestamp, setInputMethodTimestamp] = useState<number>(0);
 
-    // Function to handle mouse move
-    const handleMouseMove = (
-        event: React.MouseEvent<HTMLCanvasElement, MouseEvent>
-    ) => {
-        if (
-            inputMethod != InputMethod.Mouse &&
-            inputMethod != null &&
-            Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
-        ) {
-            return;
-        }
+    handleHover(eventX, eventY, canvasRef.current, image, zoomLevel);
+  };
 
-        const eventX = event.clientX;
-        const eventY = event.clientY;
+  const handleMouseEnter = () => {
+    if (
+      inputMethod != InputMethod.Mouse &&
+      inputMethod != null &&
+      Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
+    ) {
+      return;
+    }
+    setZoomLevel(props.zoom);
+  };
 
-        handleHover(eventX, eventY, canvasRef.current, image, props.zoom);
+  const handleMouseLeave = () => {
+    if (
+      inputMethod != InputMethod.Mouse &&
+      inputMethod != null &&
+      Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
+    ) {
+      return;
+    }
+    resetZoom(canvasRef.current, image);
+    setZoomLevel(props.zoom);
+  };
+
+  const handleMouseScroll = (event: React.WheelEvent) => {
+    let newZoom = 1;
+    if (event.deltaY < 0) {
+      newZoom = Math.min(Math.max(1, zoomLevel + props.step), props.maxZoom);
+    } else {
+      newZoom = Math.min(Math.max(1, zoomLevel - props.step), props.maxZoom);
+    }
+    setZoomLevel(newZoom);
+
+    handleHover(
+      mouseLocation.x,
+      mouseLocation.y,
+      canvasRef.current,
+      image,
+      newZoom,
+    );
+  };
+
+  useEffect(() => {
+    if (props.src == null) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+
+    image.onload = () => {
+      const rect = canvas.getBoundingClientRect();
+      setCanvasDimensions(canvasRef.current, image);
+
+      ctx.drawImage(image, 0, 0, rect.width, rect.height);
     };
 
-    // TODO: this should be in utils and callable here or in handleclick
-    const handleMouseLeave = () => {
-        if (
-            inputMethod != InputMethod.Mouse &&
-            inputMethod != null &&
-            Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
-        ) {
-            return;
-        }
-        resetZoom(canvasRef.current, image);
+    // If the image fails to load, you can handle it here
+    image.onerror = () => {
+      console.error("Failed to load image");
     };
 
-    useEffect(() => {
-        if (props.src == null) {
-            return;
-        }
+    // Start loading the image from the provided URL
+    image.src = props.src;
 
+    setImage(image);
+  }, [props.src]);
+
+  useEffect(() => {
+    setCanvasDimensions(canvasRef.current, image);
+    //image onload is not triggered for base64 images
+    if (image != null) {
+      resetZoom(canvasRef.current, image);
+    }
+  }, [image]);
+
+  const handleDragStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    if (event.touches.length === 1) {
+      setFirstPoint({
+        x: event.touches[0]!.clientX,
+        y: event.touches[0]!.clientY,
+      });
+    } else if (event.touches.length === 2) {
+      setPreviousPinchDistance(
+        Math.abs(event.touches[0]!.clientX - event.touches[1]!.clientX) +
+          Math.abs(event.touches[0]!.clientY - event.touches[1]!.clientY),
+      );
+      setSecondPoint({
+        x: event.touches[1]!.clientX,
+        y: event.touches[1]!.clientY,
+      });
+    }
+  };
+
+  const handleDragMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+
+    if (event.touches.length >= 1) {
+      if (zoomed) {
         const canvas = canvasRef.current;
         if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        const changeX = firstPoint.x - event.touches[0]!.clientX;
+        let newX = zoomPoint.x + changeX / props.zoom;
+        newX = Math.max(0, Math.min(newX, rect.width));
+        const changeY = firstPoint.y - event.touches[0]!.clientY;
+        let newY = zoomPoint.y + changeY / props.zoom;
+        newY = Math.max(0, Math.min(newY, rect.height));
 
-        const image = new Image();
-        image.crossOrigin = "anonymous";
-
-        image.onload = () => {
-            const rect = canvas.getBoundingClientRect();
-            setCanvasDimensions(canvasRef.current, image);
-            //const w = image.width >= image.height ? rect.width : rect.width *
-
-            ctx.drawImage(image, 0, 0, rect.width, rect.height);
-        };
-
-        // If the image fails to load, you can handle it here
-        image.onerror = () => {
-            console.error("Failed to load image");
-        };
-
-        // Start loading the image from the provided URL
-        image.src = props.src;
-
-        setImage(image);
-    }, [props.src]);
-
-    useEffect(() => {
-        setCanvasDimensions(canvasRef.current, image);
-        //image onload is not triggered for base64 images
-        if (image != null) {
-            resetZoom(canvasRef.current, image);
-        }
-    }, [image]);
-
-    const handleDragStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
-        setDragState({
-            x: event.touches[0]!.clientX,
-            y: event.touches[0]!.clientY,
+        setZoomPoint({
+          x: newX,
+          y: newY,
         });
-        setDragging(false);
+        setFirstPoint({
+          x: event.touches[0]!.clientX,
+          y: event.touches[0]!.clientY,
+        });
+
+        setDragging(true);
         setInputMethod(InputMethod.Touch);
         setInputMethodTimestamp(Date.now());
-    };
 
-    const handleDragMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
-        event.preventDefault();
+        handleHover(newX, newY, canvasRef.current, image, zoomLevel); //props.zoom
+      }
+    }
+    if (event.touches.length >= 2) {
+      const dist =
+        Math.abs(firstPoint.x - event.touches[1]!.clientX) +
+        Math.abs(firstPoint.y - event.touches[1]!.clientY);
 
-        if (zoomed) {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const rect = canvas.getBoundingClientRect();
+      const newZoom =
+        zoomLevel + (dist - previousPinchDistance) / RESOLUTIONTOZOOMMULTIPLIER;
+      setPreviousPinchDistance(dist);
+      setSecondPoint({
+        x: event.touches[1]!.clientX,
+        y: event.touches[1]!.clientY,
+      });
 
-            let changeX = dragState.x - event.touches[0]!.clientX;
-            let newX = zoomPoint.x + changeX / props.zoom;
-            newX = Math.max(0, Math.min(newX, rect.width));
-            let changeY = dragState.y - event.touches[0]!.clientY;
-            let newY = zoomPoint.y + changeY / props.zoom;
-            newY = Math.max(0, Math.min(newY, rect.height));
+      if (newZoom > 1 && newZoom < props.maxZoom) {
+        setZoomLevel(newZoom);
 
-            setNewZoomPoint({
-                x: newX,
-                y: newY,
-            });
+        handleHover(
+          zoomPoint.x,
+          zoomPoint.y,
+          canvasRef.current,
+          image,
+          newZoom,
+        );
+      }
+    }
+  };
 
-            setDragging(true);
-            setInputMethod(InputMethod.Touch);
-            setInputMethodTimestamp(Date.now());
+  const handleDragEnd = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    setFirstPoint(secondPoint);
+    setInputMethod(InputMethod.Touch);
+    setInputMethodTimestamp(Date.now());
+  };
 
-            handleHover(newX, newY, canvasRef.current, image, props.zoom);
-        }
-    };
-
-    const handleDragEnd = (event: React.TouchEvent<HTMLCanvasElement>) => {
-        if (!dragging) {
-            if (!zoomed) {
-                handleHover(
-                    dragState.x,
-                    dragState.y,
-                    canvasRef.current,
-                    image,
-                    props.zoom
-                );
-                setZoomPoint(dragState);
-            } else {
-                resetZoom(canvasRef.current, image);
-            }
-            setZoomed(!zoomed);
-        } else {
-            setZoomPoint(newZoomPoint);
-        }
-        setInputMethod(InputMethod.Touch);
-        setInputMethodTimestamp(Date.now());
-    };
-    return (
-        <div style={{ height: "100%", width: "100%" }}>
-            <a >
-                <canvas
-                    style={{ touchAction: "none" }} //disable browser window scroll on mobile
-                    ref={canvasRef}
-                    width={10}
-                    height={10}
-                    onMouseMove={handleMouseMove} // Track mouse movement
-                    onMouseLeave={handleMouseLeave} // Handle mouse leave
-                    onTouchStart={handleDragStart}
-                    onTouchMove={handleDragMove}
-                    onTouchEnd={handleDragEnd}
-                />
-            </a>
-        </div>
-    );
+  return (
+    <div style={{ height: "100%", width: "100%" }}>
+      <a /*href={props.src} target={"_blank"}*/>
+        <canvas
+          style={{ touchAction: "none" }} //disable browser window scroll on mobile
+          ref={canvasRef}
+          width={10}
+          height={10}
+          onWheel={handleMouseScroll}
+          onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseMove} // Track mouse movement
+          onMouseLeave={handleMouseLeave} // Handle mouse leave
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+        />
+      </a>
+    </div>
+  );
 }
