@@ -1,4 +1,4 @@
-# react-image-zoomable-in-place
+# react-image-zoom-in-place
 
 A work in progress (WIP) react component do display zoomable images.
 
