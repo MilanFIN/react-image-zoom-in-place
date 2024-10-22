@@ -41,13 +41,13 @@ import { ZoomableImage } from "react-image-zoom-in-place";
 
 export default function Home() {
   return (
-      <div>
+      <div style={{ width: '500px', height: "500px"}}>
         <ZoomableImage
           src={"<image url or base64 here>"}
           alt="alt text"
           zoom={2}
           maxZoom={10}
-		  step={0.1}
+          step={0.1}
         />
       </div>
   );
