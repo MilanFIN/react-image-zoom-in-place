@@ -1,6 +1,6 @@
 {
     "name": "react-image-zoom-in-place",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "",
     "main": "lib/index.js",
     "types": "index.d.ts",
@@ -20,5 +20,9 @@
     },
     "files": [
         "lib/**/*"
-    ]
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/MilanFIN/react-image-zoom-in-place.git"
+    }
 }

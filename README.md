@@ -2,11 +2,10 @@
 
 A work in progress (WIP) react component do display zoomable images.
 
-The zoom is done within the original image bounds. The image component scales to the size of the parent component. 
+The zoom works both on mouse & touchscreen, and is done within the original bounds of the image.
 
 ## TODO:
 
-* Make canvas size respect image aspect ratio without relying on the parent component styling
 * Fix some glitches in the pinch zoom and dragging.
 
 ## Behavior
@@ -28,10 +27,15 @@ The zoom is done within the original image bounds. The image component scales to
 | Name     | Type    | Optional | Description |
 | -------- | ------- | -------  | ------- |
 | src      | string  |          |url or base64 string for the image|
-| alt      | string  |          |alt text for the image (WIP)|
+| alt      | string  |   x      |alt text for the image (using an aria-label)|
 | zoom     | number  |          |default zoom on mouse hover|
 | maxZoom  | number  |          |maximum allowed zoom muliplication by scroll or touch pinch|
 | step     | number  |          |zoom step on mouse scroll|
+| width    | number  |   x      |override default width|
+| height   | number  |   x      |override default height|
+
+Width and height parameters are optional, but using them can avoid layout shift when the image loads.
+If only one is defined, the second one is derived from the image aspect ratio.
 
 ## Usage
 
@@ -41,7 +45,7 @@ import { ZoomableImage } from "react-image-zoom-in-place";
 
 export default function Home() {
   return (
-      <div style={{ width: '500px', height: "500px"}}>
+      <div >
         <ZoomableImage
           src={"<image url or base64 here>"}
           alt="alt text"
@@ -58,6 +62,10 @@ export default function Home() {
 ## License
 
 MIT
+
+# Git
+
+[https://github.com/MilanFIN/react-image-zoom-in-place](https://github.com/MilanFIN/react-image-zoom-in-place) 
 
 ## NPM
 

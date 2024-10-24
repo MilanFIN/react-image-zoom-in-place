@@ -4,10 +4,12 @@ import { handleHover, resetZoom, setCanvasDimensions } from "./utils";
 
 type ZoomableProps = {
   src: string;
-  alt: string;
+  alt?: string;
   zoom: number;
   maxZoom: number;
   step: number;
+  width?: number;
+  height?: number;
 };
 
 type Point = {
@@ -26,17 +28,7 @@ const RESOLUTIONTOZOOMMULTIPLIER = 100;
 export function ZoomableImage(props: ZoomableProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [zoomed, setZoomed] = useState(true);
-  const [dragging, setDragging] = useState(false);
-  const [dragState, setDragState] = useState<Point>({
-    x: 0,
-    y: 0,
-  });
   const [zoomPoint, setZoomPoint] = useState<Point>({
-    x: 0,
-    y: 0,
-  });
-  const [newZoomPoint, setNewZoomPoint] = useState<Point>({
     x: 0,
     y: 0,
   });
@@ -82,7 +74,7 @@ export function ZoomableImage(props: ZoomableProps) {
       y: eventY,
     });
 
-    handleHover(eventX, eventY, canvasRef.current, image, zoomLevel);
+    handleHover(eventX, eventY, canvasRef.current, image, zoomLevel, props.width, props.height);
   };
 
   const handleMouseEnter = () => {
@@ -104,7 +96,7 @@ export function ZoomableImage(props: ZoomableProps) {
     ) {
       return;
     }
-    resetZoom(canvasRef.current, image);
+    resetZoom(canvasRef.current, image, props.width, props.height);
     setZoomLevel(props.zoom);
   };
 
@@ -123,6 +115,8 @@ export function ZoomableImage(props: ZoomableProps) {
       canvasRef.current,
       image,
       newZoom,
+      props.width,
+      props.height
     );
   };
 
@@ -142,7 +136,7 @@ export function ZoomableImage(props: ZoomableProps) {
 
     image.onload = () => {
       const rect = canvas.getBoundingClientRect();
-      setCanvasDimensions(canvasRef.current, image);
+      setCanvasDimensions(canvasRef.current, image, props.width, props.height);
 
       ctx.drawImage(image, 0, 0, rect.width, rect.height);
     };
@@ -159,12 +153,12 @@ export function ZoomableImage(props: ZoomableProps) {
   }, [props.src]);
 
   useEffect(() => {
-    setCanvasDimensions(canvasRef.current, image);
+    setCanvasDimensions(canvasRef.current, image, props.width, props.height);
     //image onload is not triggered for base64 images
     if (image != null) {
-      resetZoom(canvasRef.current, image);
+      resetZoom(canvasRef.current, image, props.width, props.height);
     }
-  }, [image]);
+  }, [image, props.width, props.height]);
 
   const handleDragStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
     if (event.touches.length === 1) {
@@ -188,33 +182,38 @@ export function ZoomableImage(props: ZoomableProps) {
     event.preventDefault();
 
     if (event.touches.length >= 1) {
-      if (zoomed) {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
 
-        const changeX = firstPoint.x - event.touches[0]!.clientX;
-        let newX = zoomPoint.x + changeX / props.zoom;
-        newX = Math.max(0, Math.min(newX, rect.width));
-        const changeY = firstPoint.y - event.touches[0]!.clientY;
-        let newY = zoomPoint.y + changeY / props.zoom;
-        newY = Math.max(0, Math.min(newY, rect.height));
+      const changeX = firstPoint.x - event.touches[0]!.clientX;
+      let newX = zoomPoint.x + changeX / props.zoom;
+      newX = Math.max(0, Math.min(newX, rect.width));
+      const changeY = firstPoint.y - event.touches[0]!.clientY;
+      let newY = zoomPoint.y + changeY / props.zoom;
+      newY = Math.max(0, Math.min(newY, rect.height));
 
-        setZoomPoint({
-          x: newX,
-          y: newY,
-        });
-        setFirstPoint({
-          x: event.touches[0]!.clientX,
-          y: event.touches[0]!.clientY,
-        });
+      setZoomPoint({
+        x: newX,
+        y: newY,
+      });
+      setFirstPoint({
+        x: event.touches[0]!.clientX,
+        y: event.touches[0]!.clientY,
+      });
 
-        setDragging(true);
-        setInputMethod(InputMethod.Touch);
-        setInputMethodTimestamp(Date.now());
+      setInputMethod(InputMethod.Touch);
+      setInputMethodTimestamp(Date.now());
 
-        handleHover(newX, newY, canvasRef.current, image, zoomLevel); //props.zoom
-      }
+      handleHover(
+        newX,
+        newY,
+        canvasRef.current,
+        image,
+        zoomLevel,
+        props.width,
+        props.height,
+      ); //props.zoom
     }
     if (event.touches.length >= 2) {
       const dist =
@@ -238,6 +237,8 @@ export function ZoomableImage(props: ZoomableProps) {
           canvasRef.current,
           image,
           newZoom,
+          props.width,
+          props.height,
         );
       }
     }
@@ -255,8 +256,8 @@ export function ZoomableImage(props: ZoomableProps) {
         <canvas
           style={{ touchAction: "none" }} //disable browser window scroll on mobile
           ref={canvasRef}
-          width={10}
-          height={10}
+          width={props.width ? props.width : 1}
+          height={props.height ? props.height : 1}
           onWheel={handleMouseScroll}
           onMouseEnter={handleMouseEnter}
           onMouseMove={handleMouseMove} // Track mouse movement
@@ -264,6 +265,7 @@ export function ZoomableImage(props: ZoomableProps) {
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
           onTouchEnd={handleDragEnd}
+          aria-label={props.alt ? props.alt : ""}
         />
       </a>
     </div>
