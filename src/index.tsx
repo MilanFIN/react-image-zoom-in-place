@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { handleHover, resetZoom, setCanvasDimensions } from "./utils";
+import {
+  mouseLocationToImageOffset,
+  renderAtPointAndZoom,
+  setCanvasDimensions,
+} from "./utils";
 
 type ZoomableProps = {
   src: string;
@@ -17,132 +21,57 @@ type Point = {
   y: number;
 };
 
-enum InputMethod {
-  Mouse = "Mouse",
-  Touch = "Touch",
-}
-
-const INPUTMETHODLIFESPAN = 200; //ms
-const RESOLUTIONTOZOOMMULTIPLIER = 100;
-
 export function ZoomableImage(props: ZoomableProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [zoomPoint, setZoomPoint] = useState<Point>({
-    x: 0,
-    y: 0,
-  });
-
-  const [mouseLocation, setMouseLocation] = useState<Point>({
+  const [imageOffset, setImageOffset] = useState<Point>({
     x: 0,
     y: 0,
   });
 
   const [zoomLevel, setZoomLevel] = useState<number>(1);
 
-  const [inputMethod, setInputMethod] = useState<InputMethod | null>(null);
-  const [inputMethodTimestamp, setInputMethodTimestamp] = useState<number>(0);
-
   //touch screen state vars
   const [previousPosition, setPerviousPosition] = useState<Point | null>(null);
   const [previousDistance, setPreviousDistance] = useState<number | null>(null);
 
-  const updatePreviousPosition = (x: number, y: number) => {
+  if (image) {
+    renderAtPointAndZoom(
+      imageOffset.x,
+      imageOffset.y,
+      zoomLevel,
+      canvasRef.current,
+      image,
+    );
+  }
+
+  const updateLocation = (x: number, y: number, zoom: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-
     if (previousPosition) {
-      let newX = zoomPoint.x - (x - previousPosition.x) / zoomLevel;
-      if (newX < 0) newX = 0;
-      if (newX > rect.width) newX = rect.width;
-      let newY = zoomPoint.y - (y - previousPosition.y) / zoomLevel;
-      if (newY < 0) newY = 0;
-      if (newY > rect.height) newY = rect.height;
+      const zoomRatio = zoom / zoomLevel;
 
-      setZoomPoint({
-        x: newX,
-        y: newY,
-      });
+      const deltaX = x - previousPosition.x;
+      const deltaY = y - previousPosition.y;
+
+      const newOffset = {
+        x: imageOffset.x - (x - imageOffset.x) * (zoomRatio - 1) + deltaX,
+        y: imageOffset.y - (y - imageOffset.y) * (zoomRatio - 1) + deltaY,
+      };
+
+      newOffset.x = Math.min(
+        0,
+        Math.max(newOffset.x, canvas.width - canvas.width * zoom),
+      );
+      newOffset.y = Math.min(
+        0,
+        Math.max(newOffset.y, canvas.height - canvas.height * zoom),
+      );
+
+      setImageOffset(newOffset);
     }
     setPerviousPosition({ x: x, y: y });
-  };
-
-  // Function to handle mouse move
-  const handleMouseMove = (
-    event: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) => {
-    if (
-      inputMethod != InputMethod.Mouse &&
-      inputMethod != null &&
-      Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
-    ) {
-      return;
-    }
-
-    const eventX = event.clientX;
-    const eventY = event.clientY;
-    setMouseLocation({
-      x: eventX,
-      y: eventY,
-    });
-
-    handleHover(
-      eventX,
-      eventY,
-      canvasRef.current,
-      image,
-      zoomLevel,
-      true,
-
-      props.width,
-      props.height,
-    );
-  };
-
-  const handleMouseEnter = () => {
-    if (
-      inputMethod != InputMethod.Mouse &&
-      inputMethod != null &&
-      Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
-    ) {
-      return;
-    }
-    setZoomLevel(props.zoom);
-  };
-
-  const handleMouseLeave = () => {
-    if (
-      inputMethod != InputMethod.Mouse &&
-      inputMethod != null &&
-      Date.now() - inputMethodTimestamp < INPUTMETHODLIFESPAN
-    ) {
-      return;
-    }
-    resetZoom(canvasRef.current, image, props.width, props.height);
-    setZoomLevel(props.zoom);
-  };
-
-  const handleMouseScroll = (event: React.WheelEvent) => {
-    let newZoom = 1;
-    if (event.deltaY < 0) {
-      newZoom = Math.min(Math.max(1, zoomLevel + props.step), props.maxZoom);
-    } else {
-      newZoom = Math.min(Math.max(1, zoomLevel - props.step), props.maxZoom);
-    }
-    setZoomLevel(newZoom);
-
-    handleHover(
-      mouseLocation.x,
-      mouseLocation.y,
-      canvasRef.current,
-      image,
-      newZoom,
-      true,
-
-      props.width,
-      props.height,
-    );
+    setZoomLevel(zoom);
   };
 
   useEffect(() => {
@@ -178,12 +107,73 @@ export function ZoomableImage(props: ZoomableProps) {
   }, [props.src]);
 
   useEffect(() => {
+    if (!canvasRef.current) return;
     setCanvasDimensions(canvasRef.current, image, props.width, props.height);
     //image onload is not triggered for base64 images
     if (image != null) {
-      resetZoom(canvasRef.current, image, props.width, props.height);
+      setImageOffset({x:0, y:0})
+      setZoomLevel(1);
     }
   }, [image, props.width, props.height]);
+
+  //mouse events
+
+  const handleMouseEnter = () => {
+    setZoomLevel(props.zoom);
+  };
+
+  // Function to handle mouse move
+  const handleMouseMove = (
+    event: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) => {
+    const eventX = event.clientX;
+    const eventY = event.clientY;
+
+    const [x, y] = mouseLocationToImageOffset(
+      eventX,
+      eventY,
+      zoomLevel,
+      canvasRef.current,
+    );
+    setImageOffset({
+      x: x,
+      y: y,
+    });
+    setPerviousPosition(null);
+  };
+
+  const handleMouseLeave = () => {
+    setImageOffset({
+      x: 0,
+      y: 0,
+    });
+    setZoomLevel(1);
+    setPerviousPosition(null);
+  };
+
+  const handleMouseScroll = (event: React.WheelEvent) => {
+    let newZoom = 1;
+    if (event.deltaY < 0) {
+      newZoom = Math.min(Math.max(1, zoomLevel + props.step), props.maxZoom);
+    } else {
+      newZoom = Math.min(Math.max(1, zoomLevel - props.step), props.maxZoom);
+    }
+    
+    const [x, y] = mouseLocationToImageOffset(
+      event.clientX,
+      event.clientY,
+      newZoom,
+      canvasRef.current,
+    );
+    setImageOffset({
+      x: x,
+      y: y,
+    });
+    setZoomLevel(newZoom);
+
+    setPerviousPosition(null);
+
+  }
 
   //touch screen events
   const handleSingleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -194,19 +184,7 @@ export function ZoomableImage(props: ZoomableProps) {
     const x = Math.min(400, Math.max(0, touch.clientX - rect.left));
     const y = Math.min(400, Math.max(0, touch.clientY - rect.top));
 
-    updatePreviousPosition(x, y);
-
-    handleHover(
-      zoomPoint.x,
-      zoomPoint.y,
-      canvasRef.current,
-      image,
-      zoomLevel,
-      false,
-
-      props.width,
-      props.height,
-    );
+    updateLocation(x, y, zoomLevel);
   };
 
   const handlePinchZoomMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -225,8 +203,6 @@ export function ZoomableImage(props: ZoomableProps) {
     const x = Math.min(400, Math.max(0, midpointX - rect.left));
     const y = Math.min(400, Math.max(0, midpointY - rect.top));
 
-    updatePreviousPosition(x, y);
-    console.log(midpointY - rect.top);
     let newZoomLevel = zoomLevel;
 
     if (previousDistance) {
@@ -235,21 +211,11 @@ export function ZoomableImage(props: ZoomableProps) {
         (currentDistance - previousDistance) /
           Math.max(rect.width, rect.height);
       newZoomLevel = Math.max(1, Math.min(props.maxZoom, newZoomLevel));
-      setZoomLevel(newZoomLevel);
     }
+
+    updateLocation(x, y, newZoomLevel);
     setPreviousDistance(currentDistance);
 
-    handleHover(
-      zoomPoint.x,
-      zoomPoint.y,
-      canvasRef.current,
-      image,
-      newZoomLevel,
-      false,
-
-      props.width,
-      props.height,
-    );
   };
 
   const handleDragMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
@@ -261,37 +227,25 @@ export function ZoomableImage(props: ZoomableProps) {
   const resetDrag = (event: React.TouchEvent<HTMLCanvasElement>) => {
     setPerviousPosition(null);
     setPreviousDistance(null);
-
-    setInputMethod(InputMethod.Touch);
-    setInputMethodTimestamp(Date.now());
   };
 
   return (
     <div style={{ height: "100%", width: "100%" }}>
-      {/*
-      <p>Touch and drag to move, pinch to zoom.</p>
-      <p>
-        Drag Position: X: {zoomPoint.x.toFixed(0)}, Y:{" "}
-        {zoomPoint.y.toFixed(0)}
-      </p>
-      <p>Zoom Level: {zoomLevel.toFixed(2)}</p>*/}
 
-      <a /*href={props.src} target={"_blank"}*/>
         <canvas
           style={{ touchAction: "none" }} //disable browser window scroll on mobile
           ref={canvasRef}
           width={props.width ? props.width : 1}
           height={props.height ? props.height : 1}
-          onWheel={handleMouseScroll}
-          onMouseEnter={handleMouseEnter}
-          onMouseMove={handleMouseMove} // Track mouse movement
-          onMouseLeave={handleMouseLeave} // Handle mouse leave
           onTouchStart={resetDrag}
           onTouchMove={handleDragMove}
           onTouchEnd={resetDrag}
+          onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onWheel={handleMouseScroll}
           aria-label={props.alt ? props.alt : ""}
         />
-      </a>
     </div>
   );
 }

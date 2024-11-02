@@ -6,7 +6,8 @@ The zoom works both on mouse & touchscreen, and is done within the original boun
 
 ## TODO:
 
-* Fix some glitches in the pinch zoom and dragging.
+* Code cleanup
+* Tests to ensure functioning in edge cases
 
 ## Behavior
 
