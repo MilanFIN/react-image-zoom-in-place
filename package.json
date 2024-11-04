@@ -5,7 +5,7 @@
     "main": "lib/index.js",
     "types": "index.d.ts",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "vitest",
         "build": "tsc"
     },
     "author": "MilanFIN",
@@ -16,7 +16,11 @@
         "react-dom": "^18.3.1"
     },
     "devDependencies": {
-        "typescript": "^5.6.3"
+        "@testing-library/jest-dom": "^6.6.3",
+        "@testing-library/react": "^16.0.1",
+        "jsdom": "^25.0.1",
+        "typescript": "^5.6.3",
+        "vitest": "^2.1.4"
     },
     "files": [
         "lib/**/*"
