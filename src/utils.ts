@@ -63,14 +63,14 @@ export function mouseLocationToImageOffset(
 export function calculateNewZoomPosition(
     x: number,
     y: number,
-    zoomLevel: number,
-    zoom: number,
+    previousZoom: number,
+    newZoom: number,
     previousPosition: { x: number; y: number },
     imageOffset: { x: number; y: number },
     width: number,
     height: number
 ) {
-    const zoomRatio = zoom / zoomLevel;
+    const zoomRatio = newZoom / previousZoom;
 
     const deltaX = x - previousPosition.x;
     const deltaY = y - previousPosition.y;
@@ -82,11 +82,11 @@ export function calculateNewZoomPosition(
 
     newOffset.x = Math.min(
         0,
-        Math.max(newOffset.x, width - width * zoom)
+        Math.max(newOffset.x, width - width * newZoom)
     );
     newOffset.y = Math.min(
         0,
-        Math.max(newOffset.y, height - height * zoom)
+        Math.max(newOffset.y, height - height * newZoom)
     );
 
     return newOffset;
