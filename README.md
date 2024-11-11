@@ -1,13 +1,8 @@
 # react-image-zoom-in-place
 
-A work in progress (WIP) react component do display zoomable images.
+A react component to display zoomable images.
 
 The zoom works both on mouse & touchscreen, and is done within the original bounds of the image.
-
-## TODO:
-
-* Code cleanup
-* Tests to ensure functioning in edge cases
 
 ## Behavior
 
